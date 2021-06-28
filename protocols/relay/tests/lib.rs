@@ -73,7 +73,9 @@ fn src_connect_to_dst_listening_via_relay() {
     relay_swarm.listen_on(relay_addr.clone()).unwrap();
     spawn_swarm_on_pool(&pool, relay_swarm);
 
-    dst_swarm.listen_on(dst_listen_addr_via_relay.clone()).unwrap();
+    dst_swarm
+        .listen_on(dst_listen_addr_via_relay.clone())
+        .unwrap();
 
     pool.run_until(async {
         // Destination Node dialing Relay.
@@ -381,9 +383,9 @@ fn src_try_connect_to_offline_dst() {
 
         loop {
             match src_swarm.select_next_some().await {
-                SwarmEvent::UnreachableAddr { address, peer_id, .. }
-                    if address == dst_addr_via_relay =>
-                {
+                SwarmEvent::UnreachableAddr {
+                    address, peer_id, ..
+                } if address == dst_addr_via_relay => {
                     assert_eq!(peer_id, dst_peer_id);
                     break;
                 }
@@ -438,9 +440,9 @@ fn src_try_connect_to_unsupported_dst() {
 
         loop {
             match src_swarm.select_next_some().await {
-                SwarmEvent::UnreachableAddr { address, peer_id, .. }
-                    if address == dst_addr_via_relay =>
-                {
+                SwarmEvent::UnreachableAddr {
+                    address, peer_id, ..
+                } if address == dst_addr_via_relay => {
                     assert_eq!(peer_id, dst_peer_id);
                     break;
                 }
@@ -488,10 +490,11 @@ fn src_try_connect_to_offline_dst_via_offline_relay() {
 
         // Source Node fail to reach Destination Node due to failure reaching Relay.
         match src_swarm.select_next_some().await {
-            SwarmEvent::UnreachableAddr { address, peer_id, .. }
-                if address == dst_addr_via_relay => {
-                    assert_eq!(peer_id, dst_peer_id);
-                }
+            SwarmEvent::UnreachableAddr {
+                address, peer_id, ..
+            } if address == dst_addr_via_relay => {
+                assert_eq!(peer_id, dst_peer_id);
+            }
             e => panic!("{:?}", e),
         }
     });
@@ -569,11 +572,13 @@ fn firewalled_src_discover_firewalled_dst_via_kad_and_connect_to_dst_via_routabl
         let query_id = dst_swarm.behaviour_mut().kad.bootstrap().unwrap();
         loop {
             match dst_swarm.select_next_some().await {
-                SwarmEvent::Behaviour(CombinedEvent::Kad(KademliaEvent::OutboundQueryCompleted {
-                    id,
-                    result: QueryResult::Bootstrap(Ok(_)),
-                    ..
-                })) if query_id == id => {
+                SwarmEvent::Behaviour(CombinedEvent::Kad(
+                    KademliaEvent::OutboundQueryCompleted {
+                        id,
+                        result: QueryResult::Bootstrap(Ok(_)),
+                        ..
+                    },
+                )) if query_id == id => {
                     if dst_swarm.behaviour_mut().kad.iter_queries().count() == 0 {
                         break;
                     }
@@ -647,11 +652,13 @@ fn firewalled_src_discover_firewalled_dst_via_kad_and_connect_to_dst_via_routabl
                     SwarmEvent::Dialing(peer_id)
                         if peer_id == relay_peer_id || peer_id == dst_peer_id => {}
                     SwarmEvent::Behaviour(CombinedEvent::Ping(_)) => {}
-                    SwarmEvent::Behaviour(CombinedEvent::Kad(KademliaEvent::OutboundQueryCompleted {
-                        id,
-                        result: QueryResult::GetClosestPeers(Ok(GetClosestPeersOk { .. })),
-                        ..
-                    })) if id == query_id => {
+                    SwarmEvent::Behaviour(CombinedEvent::Kad(
+                        KademliaEvent::OutboundQueryCompleted {
+                            id,
+                            result: QueryResult::GetClosestPeers(Ok(GetClosestPeersOk { .. })),
+                            ..
+                        },
+                    )) if id == query_id => {
                         tries += 1;
                         if tries > 300 {
                             panic!("Too many retries.");
@@ -904,8 +911,12 @@ fn yield_incoming_connection_through_correct_listener() {
     relay_3_swarm.listen_on(relay_3_addr.clone()).unwrap();
     spawn_swarm_on_pool(&pool, relay_3_swarm);
 
-    dst_swarm.listen_on(relay_1_addr_incl_circuit.clone()).unwrap();
-    dst_swarm.listen_on(relay_2_addr_incl_circuit.clone()).unwrap();
+    dst_swarm
+        .listen_on(relay_1_addr_incl_circuit.clone())
+        .unwrap();
+    dst_swarm
+        .listen_on(relay_2_addr_incl_circuit.clone())
+        .unwrap();
     // Listen on own address in order for relay 3 to be able to connect to destination node.
     dst_swarm.listen_on(dst_addr.clone()).unwrap();
 

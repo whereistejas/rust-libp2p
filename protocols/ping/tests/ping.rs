@@ -20,13 +20,12 @@
 
 //! Integration tests for the `Ping` network behaviour.
 
+use futures::{channel::mpsc, prelude::*};
 use libp2p_core::{
-    Multiaddr,
-    PeerId,
     identity,
     muxing::StreamMuxerBox,
     transport::{self, Transport},
-    upgrade
+    upgrade, Multiaddr, PeerId,
 };
 use libp2p_mplex as mplex;
 use libp2p_noise as noise;
@@ -34,7 +33,6 @@ use libp2p_ping::*;
 use libp2p_swarm::{Swarm, SwarmEvent};
 use libp2p_tcp::TcpConfig;
 use libp2p_yamux as yamux;
-use futures::{prelude::*, channel::mpsc};
 use quickcheck::*;
 use rand::prelude::*;
 use std::{num::NonZeroU8, time::Duration};
@@ -65,13 +63,18 @@ fn ping_pong() {
             loop {
                 match swarm1.select_next_some().await {
                     SwarmEvent::NewListenAddr(listener) => tx.send(listener).await.unwrap(),
-                    SwarmEvent::Behaviour(PingEvent { peer, result: Ok(PingSuccess::Ping { rtt }) }) => {
+                    SwarmEvent::Behaviour(PingEvent {
+                        peer,
+                        result: Ok(PingSuccess::Ping { rtt }),
+                    }) => {
                         count1 -= 1;
                         if count1 == 0 {
-                            return (pid1.clone(), peer, rtt)
+                            return (pid1.clone(), peer, rtt);
                         }
-                    },
-                    SwarmEvent::Behaviour(PingEvent { result: Err(e), .. }) => panic!("Ping failure: {:?}", e),
+                    }
+                    SwarmEvent::Behaviour(PingEvent { result: Err(e), .. }) => {
+                        panic!("Ping failure: {:?}", e)
+                    }
                     _ => {}
                 }
             }
@@ -83,19 +86,18 @@ fn ping_pong() {
 
             loop {
                 match swarm2.select_next_some().await {
-                    SwarmEvent::Behaviour(PingEvent { 
-                        peer, 
-                        result: Ok(PingSuccess::Ping { rtt }) 
+                    SwarmEvent::Behaviour(PingEvent {
+                        peer,
+                        result: Ok(PingSuccess::Ping { rtt }),
                     }) => {
                         count2 -= 1;
                         if count2 == 0 {
-                            return (pid2.clone(), peer, rtt)
+                            return (pid2.clone(), peer, rtt);
                         }
-                    },
-                    SwarmEvent::Behaviour(PingEvent { 
-                        result: Err(e), 
-                        .. 
-                    }) => panic!("Ping failure: {:?}", e),
+                    }
+                    SwarmEvent::Behaviour(PingEvent { result: Err(e), .. }) => {
+                        panic!("Ping failure: {:?}", e)
+                    }
                     _ => {}
                 }
             }
@@ -107,7 +109,7 @@ fn ping_pong() {
         assert!(rtt < Duration::from_millis(50));
     }
 
-    QuickCheck::new().tests(10).quickcheck(prop as fn(_,_))
+    QuickCheck::new().tests(10).quickcheck(prop as fn(_, _))
 }
 
 /// Tests that the connection is closed upon a configurable
@@ -139,18 +141,15 @@ fn max_failures() {
                 match swarm1.select_next_some().await {
                     SwarmEvent::NewListenAddr(listener) => tx.send(listener).await.unwrap(),
                     SwarmEvent::Behaviour(PingEvent {
-                        result: Ok(PingSuccess::Ping { .. }), ..
+                        result: Ok(PingSuccess::Ping { .. }),
+                        ..
                     }) => {
                         count1 = 0; // there may be an occasional success
                     }
-                    SwarmEvent::Behaviour(PingEvent {
-                        result: Err(_), ..
-                    }) => {
+                    SwarmEvent::Behaviour(PingEvent { result: Err(_), .. }) => {
                         count1 += 1;
                     }
-                    SwarmEvent::ConnectionClosed { .. } => {
-                        return count1
-                    }
+                    SwarmEvent::ConnectionClosed { .. } => return count1,
                     _ => {}
                 }
             }
@@ -164,18 +163,15 @@ fn max_failures() {
             loop {
                 match swarm2.select_next_some().await {
                     SwarmEvent::Behaviour(PingEvent {
-                        result: Ok(PingSuccess::Ping { .. }), ..
+                        result: Ok(PingSuccess::Ping { .. }),
+                        ..
                     }) => {
                         count2 = 0; // there may be an occasional success
                     }
-                    SwarmEvent::Behaviour(PingEvent {
-                        result: Err(_), ..
-                    }) => {
+                    SwarmEvent::Behaviour(PingEvent { result: Err(_), .. }) => {
                         count2 += 1;
                     }
-                    SwarmEvent::ConnectionClosed { .. } => {
-                        return count2
-                    }
+                    SwarmEvent::ConnectionClosed { .. } => return count2,
                     _ => {}
                 }
             }
@@ -186,28 +182,27 @@ fn max_failures() {
         assert_eq!(u8::max(count1, count2), max_failures.get() - 1);
     }
 
-    QuickCheck::new().tests(10).quickcheck(prop as fn(_,_))
+    QuickCheck::new().tests(10).quickcheck(prop as fn(_, _))
 }
 
-
-fn mk_transport(muxer: MuxerChoice) -> (
-    PeerId,
-    transport::Boxed<(PeerId, StreamMuxerBox)>
-) {
+fn mk_transport(muxer: MuxerChoice) -> (PeerId, transport::Boxed<(PeerId, StreamMuxerBox)>) {
     let id_keys = identity::Keypair::generate_ed25519();
     let peer_id = id_keys.public().into_peer_id();
-    let noise_keys = noise::Keypair::<noise::X25519Spec>::new().into_authentic(&id_keys).unwrap();
-    (peer_id, TcpConfig::new()
-        .nodelay(true)
-        .upgrade(upgrade::Version::V1)
-        .authenticate(noise::NoiseConfig::xx(noise_keys).into_authenticated())
-        .multiplex(match muxer {
-            MuxerChoice::Yamux =>
-                upgrade::EitherUpgrade::A(yamux::YamuxConfig::default()),
-            MuxerChoice::Mplex =>
-                upgrade::EitherUpgrade::B(mplex::MplexConfig::default()),
-        })
-        .boxed())
+    let noise_keys = noise::Keypair::<noise::X25519Spec>::new()
+        .into_authentic(&id_keys)
+        .unwrap();
+    (
+        peer_id,
+        TcpConfig::new()
+            .nodelay(true)
+            .upgrade(upgrade::Version::V1)
+            .authenticate(noise::NoiseConfig::xx(noise_keys).into_authenticated())
+            .multiplex(match muxer {
+                MuxerChoice::Yamux => upgrade::EitherUpgrade::A(yamux::YamuxConfig::default()),
+                MuxerChoice::Mplex => upgrade::EitherUpgrade::B(mplex::MplexConfig::default()),
+            })
+            .boxed(),
+    )
 }
 
 #[derive(Debug, Copy, Clone)]

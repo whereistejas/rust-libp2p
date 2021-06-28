@@ -27,7 +27,7 @@ use futures::prelude::*;
 use libp2p_core::{upgrade, Multiaddr, PeerId};
 use libp2p_swarm::NegotiatedSubstream;
 use prost::Message;
-use std::{fmt, error, iter};
+use std::{error, fmt, iter};
 use unsigned_varint::codec::UviBytes;
 
 /// Ask the remote to become a destination. The upgrade succeeds if the remote accepts, and fails
